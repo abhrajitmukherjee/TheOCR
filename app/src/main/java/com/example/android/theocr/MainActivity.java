@@ -28,7 +28,7 @@ public class MainActivity extends AppCompatActivity {
     Bitmap myImage;
     private String LANG="eng";
     final String TESSDATA="eng.traineddata";
-    int resource_to_parse=R.drawable.image_full;
+    int resource_to_parse=R.drawable.input_image;
     final int REQUEST_WRITE_STORAGE=1;
     final int REQUEST_READ_STORAGE=2;
     File saving;
