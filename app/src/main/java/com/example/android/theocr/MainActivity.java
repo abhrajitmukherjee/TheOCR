@@ -16,11 +16,10 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
-import android.widget.TextView;
+import android.widget.ProgressBar;
 import android.widget.Toast;
-
-import com.googlecode.tesseract.android.TessBaseAPI;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -40,6 +39,9 @@ public class MainActivity extends AppCompatActivity {
     final int REQUEST_READ_STORAGE=2;
     final int REQUEST_IMAGE_CAPTURE = 3;
     final int REQUEST_TAKE_PHOTO = 200;
+    ProgressBar mProgressbar;
+    Button mButtonProcess,mButtonCapture;
+    int mOrientation;
     File saving;
     File folder;
     String mCurrentPhotoPath;
@@ -139,8 +141,19 @@ public class MainActivity extends AppCompatActivity {
     }
     public void processParsing(View v){
         if (mImage!=null){
-            parseImage();
+            mProgressbar=(ProgressBar)findViewById(R.id.progress_bar);
+            mProgressbar.setVisibility(View.VISIBLE);
+            mButtonProcess=(Button)findViewById(R.id.button_process);
+            mButtonProcess.setEnabled(false);
+            mButtonCapture=(Button)findViewById(R.id.button_capture);
+            mButtonCapture.setEnabled(false);
 
+        //    mOrientation = getRequestedOrientation();
+    //        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_NOSENSOR);
+            new ParseOcrAsync().execute(this);
+
+        }else{
+            Log.v(TAG,"NULL");
         }
 
     }
@@ -202,27 +215,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    public void parseImage(){
-
-        String baseFolder=Environment.getExternalStorageDirectory()+ "/classlinkp";
-        BitmapFactory.Options options = new BitmapFactory.Options();
-        ImageView iv=(ImageView) findViewById(R.id.image_display);
-//        Picasso.with(this).load(resource_to_parse).resize(640,480)
-//                .into(iv);
-       options.inSampleSize = 2;
-        Bitmap myImage = BitmapFactory.decodeFile(mImageFile.toString(),options);
-        TessBaseAPI baseApi = new TessBaseAPI();
-        baseApi.init(baseFolder, LANG); // myDir + "/tessdata/eng.traineddata" must be present
-        baseApi.setImage(myImage);
-
-        String recognizedText = baseApi.getUTF8Text(); // Log or otherwise display this string...
-        TextView tv=(TextView) findViewById(R.id.text_display);
-        tv.setText(recognizedText);
-
-
-
-        baseApi.end();
-    }
 
 
     private File createImageFile() throws IOException {
