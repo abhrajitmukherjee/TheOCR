@@ -1,38 +1,50 @@
 package com.example.android.theocr;
 
 import android.Manifest;
+import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.googlecode.tesseract.android.TessBaseAPI;
-import com.squareup.picasso.Picasso;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class MainActivity extends AppCompatActivity {
-    Bitmap myImage;
+    Bitmap mImage;
+    final String TAG=MainActivity.class.getName();
     private String LANG="eng";
     final String TESSDATA="eng.traineddata";
     int resource_to_parse=R.drawable.input_image;
     final int REQUEST_WRITE_STORAGE=1;
     final int REQUEST_READ_STORAGE=2;
+    final int REQUEST_IMAGE_CAPTURE = 3;
+    final int REQUEST_TAKE_PHOTO = 200;
     File saving;
     File folder;
+    String mCurrentPhotoPath;
+    Context mContext;
+    File mImageFile;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -51,7 +63,7 @@ public class MainActivity extends AppCompatActivity {
                     REQUEST_WRITE_STORAGE);
         }
         if(permissionCheckRead==PackageManager.PERMISSION_GRANTED){
-            parseImage();
+            //parseImage();
 
         }else{
             ActivityCompat.requestPermissions(this,
@@ -59,32 +71,76 @@ public class MainActivity extends AppCompatActivity {
                     REQUEST_READ_STORAGE);
         }
 
-
-
      }
+    public void captureCamera(View view){
+
+        int permissionCheck = ContextCompat.checkSelfPermission(this,
+                Manifest.permission.CAMERA);
+
+        if (permissionCheck== PackageManager.PERMISSION_GRANTED ){
+            dispatchTakePictureIntent();
+            Log.v(TAG,"Permission granted");
+        }else
+        {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.CAMERA},
+                    REQUEST_IMAGE_CAPTURE);
+        }
+
+    }
+
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (!(requestCode == REQUEST_TAKE_PHOTO && resultCode == RESULT_OK)) {
+
+            Context context = getApplicationContext();
+            CharSequence text = "Capture Not Complete";
+            int duration = Toast.LENGTH_SHORT;
+
+            Toast toast = Toast.makeText(context, text, duration);
+            toast.show();
+
+        }else{
+            mImage = BitmapFactory.decodeFile(mImageFile.toString());
+            ImageView iv=(ImageView) findViewById(R.id.image_display);
+            iv.setImageBitmap(mImage);
+        }
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        switch (requestCode)
-        {
+        switch (requestCode) {
             case REQUEST_WRITE_STORAGE: {
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED)
-                {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     setupOCR();
-                } else
-                {
+                } else {
                     Toast.makeText(this, "The app was not allowed to write to your storage. Hence, it cannot function properly. Please consider granting it this permission", Toast.LENGTH_LONG).show();
                 }
             }
             case REQUEST_READ_STORAGE: {
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED)
-                {
-                    parseImage();
-                } else
-                {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                   // parseImage();
+                } else {
                     Toast.makeText(this, "The app was not allowed to read from storage. Hence, it cannot function properly. Please consider granting it this permission", Toast.LENGTH_LONG).show();
                 }
+
             }
+            case REQUEST_IMAGE_CAPTURE: {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    dispatchTakePictureIntent();
+                } else {
+                    Toast.makeText(this, "The app was not allowed to capture images. Hence, it cannot function properly. Please consider granting it this permission", Toast.LENGTH_LONG).show();
+                }
+            }
+
+        }
+    }
+    public void processParsing(View v){
+        if (mImage!=null){
+            parseImage();
+
         }
 
     }
@@ -151,10 +207,10 @@ public class MainActivity extends AppCompatActivity {
         String baseFolder=Environment.getExternalStorageDirectory()+ "/classlinkp";
         BitmapFactory.Options options = new BitmapFactory.Options();
         ImageView iv=(ImageView) findViewById(R.id.image_display);
-        Picasso.with(this).load(resource_to_parse).resize(640,480)
-                .into(iv);
+//        Picasso.with(this).load(resource_to_parse).resize(640,480)
+//                .into(iv);
        options.inSampleSize = 2;
-        Bitmap myImage = BitmapFactory.decodeResource(getResources(),resource_to_parse,options);
+        Bitmap myImage = BitmapFactory.decodeFile(mImageFile.toString(),options);
         TessBaseAPI baseApi = new TessBaseAPI();
         baseApi.init(baseFolder, LANG); // myDir + "/tessdata/eng.traineddata" must be present
         baseApi.setImage(myImage);
@@ -166,5 +222,47 @@ public class MainActivity extends AppCompatActivity {
 
 
         baseApi.end();
+    }
+
+
+    private File createImageFile() throws IOException {
+        // Create an image file name
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        String imageFileName = "THE_OCR_" + timeStamp + "_";
+        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        File image = File.createTempFile(
+                imageFileName,  /* prefix */
+                ".jpg",         /* suffix */
+                storageDir      /* directory */
+        );
+
+        // Save a file: path for use with ACTION_VIEW intents
+        mCurrentPhotoPath = "file:" + image.getAbsolutePath();
+        Log.v(TAG,storageDir.toString());
+        mImageFile=image;
+        return image;
+    }
+
+
+
+    public void dispatchTakePictureIntent() {
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        // Ensure that there's a camera activity to handle the intent
+        if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+            // Create the File where the photo should go
+            File photoFile = null;
+            try {
+                photoFile = createImageFile();
+            } catch (IOException ex) {
+                // Error occurred while creating the File
+                Log.e(TAG,"Exception while creating file on storage");
+            }
+            // Continue only if the File was successfully created
+            if (photoFile != null) {
+                Uri photoURI=Uri.fromFile(photoFile);
+                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
+                startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO);
+            }
+        }
     }
 }
